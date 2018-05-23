@@ -3,15 +3,17 @@
 	using System;
 	using System.Collections;
 	using System.Collections.Generic;
+	using System.ComponentModel.DataAnnotations.Schema;
 	using System.Linq;
 
 	public class DbSet<T> : ICollection<T>
+		where T : class, new()
 	{
 		internal DbSet(IEnumerable<T> entities)
 		{
 			this.Entities = entities.ToList();
 
-			this.ChangeTracker = new ChangeTracker<T>();
+			this.ChangeTracker = new ChangeTracker<T>(entities);
 		}
 
 		internal ChangeTracker<T> ChangeTracker { get; set; }
@@ -65,6 +67,14 @@
 		IEnumerator IEnumerable.GetEnumerator()
 		{
 			return this.GetEnumerator();
+		}
+
+		public void RemoveRange(IEnumerable<T> entities)
+		{
+			foreach (var entity in entities.ToArray())
+			{
+				this.Remove(entity);
+			}
 		}
 	}
 }

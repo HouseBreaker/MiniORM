@@ -1,9 +1,5 @@
 ﻿namespace MiniORM.App
 {
-	using System;
-	using System.Collections;
-	using System.Collections.Generic;
-	using System.Data.SqlTypes;
 	using System.Linq;
 	using Data;
 	using Data.Entities;
@@ -19,8 +15,16 @@
 			context.Employees.Add(new Employee
 			{
 				FirstName = "Gosho",
-				LastName = "Ivanov",
-				Department = context.Departments.First(),
+				LastName = "Inserted",
+				DepartmentId = context.Departments.First().Id,
+				IsEmployed = true,
+			});
+
+			context.Employees.Add(new Employee
+			{
+				FirstName = "Pesho",
+				LastName = "Inserted",
+				DepartmentId = context.Departments.First().Id,
 				IsEmployed = true,
 			});
 
