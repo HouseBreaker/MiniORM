@@ -19,7 +19,7 @@
 
 		public bool IsEmployed { get; set; }
 
-		[ForeignKey("Department")]
+		[ForeignKey(nameof(Department))]
 		public int DepartmentId { get; set; }
 
 		public Department Department { get; set; }

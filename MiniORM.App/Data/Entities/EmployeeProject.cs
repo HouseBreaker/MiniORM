@@ -6,11 +6,11 @@
 	public class EmployeeProject
 	{
 		[Key]
-		[ForeignKey("Employee")]
+		[ForeignKey(nameof(Employee))]
 		public int EmployeeId { get; set; }
 
 		[Key]
-		[ForeignKey("Project")]
+		[ForeignKey(nameof(Project))]
 		public int ProjectId { get; set; }
 
 		public Employee Employee { get; set; }
