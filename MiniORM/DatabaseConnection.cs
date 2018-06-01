@@ -130,7 +130,7 @@
 					columnValue = null;
 				}
 
-				var property = obj.GetType().GetProperty(columnName);
+				var property = typeof(T).GetProperty(columnName);
 				property.SetValue(obj, columnValue);
 			}
 

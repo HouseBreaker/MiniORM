@@ -5,11 +5,12 @@
 	using System.Collections.Generic;
 	using System.ComponentModel.DataAnnotations.Schema;
 	using System.Linq;
+	using JetBrains.Annotations;
 
 	public class DbSet<T> : ICollection<T>
 		where T : class, new()
 	{
-		internal DbSet(IEnumerable<T> entities)
+		internal DbSet([NotNull] IEnumerable<T> entities)
 		{
 			this.Entities = entities.ToList();
 

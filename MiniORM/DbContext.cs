@@ -25,7 +25,7 @@
 			typeof(ulong),
 			typeof(decimal),
 			typeof(bool),
-			typeof(DateTime),
+			typeof(DateTime)
 		};
 
 		public DbContext(string connectionString)
@@ -50,13 +50,14 @@
 
 			foreach (IEnumerable dbSet in dbSets)
 			{
-				var invalidEntities = ((IEnumerable<object>)dbSet)
+				var invalidEntities = ((IEnumerable<object>) dbSet)
 					.Where(entity => !IsObjectValid(entity))
 					.ToArray();
 
 				if (invalidEntities.Any())
 				{
-					throw new InvalidOperationException($"{invalidEntities.Length} Invalid Entities found in {dbSet.GetType().Name}!");
+					throw new InvalidOperationException(
+						$"{invalidEntities.Length} Invalid Entities found in {dbSet.GetType().Name}!");
 				}
 			}
 
@@ -74,7 +75,7 @@
 
 						try
 						{
-							persistMethod.Invoke(this, new object[] { dbSet, transaction });
+							persistMethod.Invoke(this, new object[] {dbSet, transaction});
 						}
 						catch (TargetInvocationException tie)
 						{
@@ -132,7 +133,7 @@
 					.GetMethod("PopulateDbSet", BindingFlags.Instance | BindingFlags.NonPublic)
 					.MakeGenericMethod(dbSetType);
 
-				populateDbSetGeneric.Invoke(this, new object[] { dbSetProperty });
+				populateDbSetGeneric.Invoke(this, new object[] {dbSetProperty});
 			}
 		}
 
@@ -166,19 +167,17 @@
 						foreignKey.GetCustomAttribute<ForeignKeyAttribute>().Name;
 					var navigationProperty = entityType.GetProperty(navigationPropertyName);
 
-					var navigationDbSet = this.GetType().GetProperties()
-						.First(pi => pi.PropertyType.IsGenericType &&
-									 pi.PropertyType.GenericTypeArguments.First() == navigationProperty.PropertyType)
+					var navigationDbSet = this.GetDbSet(navigationProperty.PropertyType)
 						.GetValue(this);
 
 					var navigationPrimaryKey = navigationProperty.PropertyType.GetProperties()
 						.First(ReflectionHelper.HasAttribute<KeyAttribute>);
 
-					foreach (var entity in (IEnumerable)dbSet)
+					foreach (var entity in (IEnumerable) dbSet)
 					{
 						var foreignKeyValue = foreignKey.GetValue(entity);
 
-						var navigationPropertyValue = ((IEnumerable<object>)navigationDbSet)
+						var navigationPropertyValue = ((IEnumerable<object>) navigationDbSet)
 							.First(currentNavigationProperty =>
 								navigationPrimaryKey.GetValue(currentNavigationProperty).Equals(foreignKeyValue));
 
@@ -188,7 +187,9 @@
 
 				var collections = entityType
 					.GetProperties()
-					.Where(pi => pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
+					.Where(pi =>
+						pi.PropertyType.IsGenericType &&
+						pi.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
 					.ToArray();
 
 				foreach (var collection in collections)
@@ -215,9 +216,9 @@
 					{
 						primaryKey = collectionType.GetProperties()
 							.First(pi => ReflectionHelper.HasAttribute<KeyAttribute>(pi) &&
-										 collectionType
-											 .GetProperty(pi.GetCustomAttribute<ForeignKeyAttribute>().Name)
-											 .PropertyType == entityType);
+							             collectionType
+								             .GetProperty(pi.GetCustomAttribute<ForeignKeyAttribute>().Name)
+								             .PropertyType == entityType);
 
 						var foreignKeyPropertyName =
 							primaryKey.GetCustomAttribute<ForeignKeyAttribute>().Name;
@@ -227,21 +228,23 @@
 							.First(ReflectionHelper.HasAttribute<KeyAttribute>);
 					}
 
-					var navigationDbSet = (IEnumerable)dbSets
+					var navigationDbSet = (IEnumerable) dbSets
 						.First(s => s.GetType().GenericTypeArguments.First() == collectionType);
 
-					foreach (var entity in (IEnumerable)dbSet)
+					foreach (var entity in (IEnumerable) dbSet)
 					{
 						var primaryKeyValue = foreignKey.GetValue(entity);
 
-						var navigationEntities = ((IEnumerable<object>)navigationDbSet)
+						var navigationEntities = ((IEnumerable<object>) navigationDbSet)
 							.Where(navigationEntity => primaryKey.GetValue(navigationEntity).Equals(primaryKeyValue))
 							.ToArray();
 
 						var castResult =
-							ReflectionHelper.InvokeStaticGenericMethod(typeof(Enumerable), "Cast", collectionType, new object[] { navigationEntities });
+							ReflectionHelper.InvokeStaticGenericMethod(typeof(Enumerable), "Cast", collectionType,
+								new object[] {navigationEntities});
 						var navigationEntitiesGeneric =
-							ReflectionHelper.InvokeStaticGenericMethod(typeof(Enumerable), "ToArray", collectionType, castResult);
+							ReflectionHelper.InvokeStaticGenericMethod(typeof(Enumerable), "ToArray", collectionType,
+								castResult);
 
 						ReflectionHelper.ReplaceBackingField(entity, collection.Name, navigationEntitiesGeneric);
 					}
@@ -275,7 +278,7 @@
 
 		private string GetTableName(Type tableType)
 		{
-			var tableName = ((TableAttribute)Attribute.GetCustomAttribute(tableType, typeof(TableAttribute)))?.Name;
+			var tableName = ((TableAttribute) Attribute.GetCustomAttribute(tableType, typeof(TableAttribute)))?.Name;
 
 			if (tableName == null)
 			{
@@ -307,8 +310,8 @@
 
 			var columns = table.GetProperties()
 				.Where(pi => dbColumns.Contains(pi.Name) &&
-							 !pi.GetCustomAttributes(typeof(NotMappedAttribute), false).Any() &&
-							 AllowedSqlTypes.Contains(pi.PropertyType))
+				             !ReflectionHelper.HasAttribute<NotMappedAttribute>(pi) &&
+				             AllowedSqlTypes.Contains(pi.PropertyType))
 				.Select(pi => pi.Name)
 				.ToArray();
 
