@@ -3,7 +3,6 @@
 	using System;
 	using System.Collections.Generic;
 	using System.ComponentModel.DataAnnotations;
-	using System.Data;
 	using System.Data.SqlClient;
 	using System.Linq;
 
@@ -110,34 +109,7 @@
 			return rows;
 		}
 
-		private static string EscapeColumn(string c)
-		{
-			var escapedColumn = $"[{c}]";
-			return escapedColumn;
-		}
-
-		private static T MapColumnsToObject<T>(string[] columnNames, object[] columns)
-		{
-			var obj = Activator.CreateInstance<T>();
-
-			for (var i = 0; i < columns.Length; i++)
-			{
-				var columnName = columnNames[i];
-				var columnValue = columns[i];
-
-				if (columnValue is DBNull)
-				{
-					columnValue = null;
-				}
-
-				var property = typeof(T).GetProperty(columnName);
-				property.SetValue(obj, columnValue);
-			}
-
-			return obj;
-		}
-
-		public void InsertEntities<T>(IEnumerable<T> entities, string tableName, string[] columns, SqlTransaction transaction = null)
+		public void InsertEntities<T>(IEnumerable<T> entities, string tableName, string[] columns)
 			where T : class
 		{
 			var identityColumns = GetIdentityColumns(tableName);
@@ -185,7 +157,7 @@
 			}
 		}
 
-		public void UpdateEntities<T>(IEnumerable<T> modifiedEntities, string tableName, string[] columns, SqlTransaction transaction = null)
+		public void UpdateEntities<T>(IEnumerable<T> modifiedEntities, string tableName, string[] columns)
 			where T : class
 		{
 			var identityColumns = GetIdentityColumns(tableName);
@@ -233,7 +205,7 @@
 			}
 		}
 
-		public void DeleteEntities<T>(IEnumerable<T> entitiesToDelete, string tableName, string[] columns, SqlTransaction transaction = null)
+		public void DeleteEntities<T>(IEnumerable<T> entitiesToDelete, string tableName, string[] columns)
 			where T : class
 		{
 			var primaryKeyProperties = typeof(T).GetProperties()
@@ -287,5 +259,32 @@
 		public void Open() => this.connection.Open();
 
 		public void Close() => this.connection.Close();
+
+		private static string EscapeColumn(string c)
+		{
+			var escapedColumn = $"[{c}]";
+			return escapedColumn;
+		}
+
+		private static T MapColumnsToObject<T>(string[] columnNames, object[] columns)
+		{
+			var obj = Activator.CreateInstance<T>();
+
+			for (var i = 0; i < columns.Length; i++)
+			{
+				var columnName = columnNames[i];
+				var columnValue = columns[i];
+
+				if (columnValue is DBNull)
+				{
+					columnValue = null;
+				}
+
+				var property = typeof(T).GetProperty(columnName);
+				property.SetValue(obj, columnValue);
+			}
+
+			return obj;
+		}
 	}
 }

@@ -39,7 +39,7 @@
 				this.InitializeDbSets();
 			}
 
-			this.MapRelations();
+			this.MapAllRelations();
 		}
 
 		public void SaveChanges()
@@ -108,18 +108,18 @@
 
 			if (dbSet.ChangeTracker.Added.Any())
 			{
-				this.connection.InsertEntities(dbSet.ChangeTracker.Added, tableName, columns, transaction);
+				this.connection.InsertEntities(dbSet.ChangeTracker.Added, tableName, columns);
 			}
 
 			var modifiedEntities = dbSet.ChangeTracker.GetModifiedEntities(dbSet).ToArray();
 			if (modifiedEntities.Any())
 			{
-				this.connection.UpdateEntities(modifiedEntities, tableName, columns, transaction);
+				this.connection.UpdateEntities(modifiedEntities, tableName, columns);
 			}
 
 			if (dbSet.ChangeTracker.Removed.Any())
 			{
-				this.connection.DeleteEntities(dbSet.ChangeTracker.Removed, tableName, columns, transaction);
+				this.connection.DeleteEntities(dbSet.ChangeTracker.Removed, tableName, columns);
 			}
 		}
 
@@ -137,6 +137,22 @@
 			}
 		}
 
+		private void MapAllRelations()
+		{
+			foreach (var dbSetProperty in this.dbSetProperties)
+			{
+				var dbSetType = dbSetProperty.PropertyType.GenericTypeArguments.First();
+
+				var mapRelationsGeneric = typeof(DbContext)
+					.GetMethod("MapRelations", BindingFlags.Instance | BindingFlags.NonPublic)
+					.MakeGenericMethod(dbSetType);
+
+				var dbSet = dbSetProperty.GetValue(this);
+
+				mapRelationsGeneric.Invoke(this, new[] {dbSet});
+			}
+		}
+
 		[UsedImplicitly]
 		private void PopulateDbSet<T>(PropertyInfo dbSet)
 			where T : class, new()
@@ -147,107 +163,103 @@
 			ReflectionHelper.ReplaceBackingField(this, dbSet.Name, dbSetInstance);
 		}
 
-		private void MapRelations()
+		[UsedImplicitly]
+		private void MapRelations<T>(DbSet<T> dbSet)
+			where T : class, new()
 		{
-			var dbSets = this.dbSetProperties
-				.Select(pi => pi.GetValue(this))
+			var entityType = typeof(T);
+
+			MapNavigationProperties(dbSet);
+
+			var collections = entityType
+				.GetProperties()
+				.Where(pi =>
+					pi.PropertyType.IsGenericType &&
+					pi.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
 				.ToArray();
 
-			foreach (var dbSet in dbSets)
+			foreach (var collection in collections)
 			{
-				var entityType = dbSet.GetType().GenericTypeArguments.First();
+				var collectionType = collection.PropertyType.GenericTypeArguments.First();
 
-				var foreignKeys = entityType.GetProperties()
-					.Where(ReflectionHelper.HasAttribute<ForeignKeyAttribute>)
+				var mapCollectionMethod = typeof(DbContext)
+					.GetMethod("MapCollection", BindingFlags.Instance | BindingFlags.NonPublic)
+					.MakeGenericMethod(entityType, collectionType);
+
+				mapCollectionMethod.Invoke(this, new object[] {dbSet, collection});
+			}
+		}
+
+		[UsedImplicitly]
+		private void MapCollection<TDbSet, TCollection>(DbSet<TDbSet> dbSet, PropertyInfo collectionProperty)
+			where TDbSet : class, new() where TCollection : class, new()
+		{
+			var entityType = typeof(TDbSet);
+			var collectionType = typeof(TCollection);
+
+			var primaryKeys = collectionType.GetProperties()
+				.Where(ReflectionHelper.HasAttribute<KeyAttribute>)
+				.ToArray();
+
+			var isManyToMany = primaryKeys.Length >= 2;
+
+			var primaryKey = primaryKeys.First();
+			var foreignKey = entityType.GetProperties()
+				.First(ReflectionHelper.HasAttribute<KeyAttribute>);
+
+			if (isManyToMany)
+			{
+				primaryKey = collectionType.GetProperties()
+					.First(pi => collectionType
+						             .GetProperty(pi.GetCustomAttribute<ForeignKeyAttribute>().Name)
+						             .PropertyType == entityType);
+			}
+
+			var navigationDbSet = (DbSet<TCollection>) this.dbSetProperties
+				.First(s => s.PropertyType.GenericTypeArguments.First() == collectionType)
+				.GetValue(this);
+
+			foreach (var entity in dbSet)
+			{
+				var primaryKeyValue = foreignKey.GetValue(entity);
+
+				var navigationEntities = navigationDbSet
+					.Where(navigationEntity => primaryKey.GetValue(navigationEntity).Equals(primaryKeyValue))
 					.ToArray();
 
-				foreach (var foreignKey in foreignKeys)
+				ReflectionHelper.ReplaceBackingField(entity, collectionProperty.Name, navigationEntities);
+			}
+		}
+
+		private void MapNavigationProperties<T>(DbSet<T> dbSet) where T : class, new()
+		{
+			var entityType = typeof(T);
+
+			var foreignKeys = entityType.GetProperties()
+				.Where(ReflectionHelper.HasAttribute<ForeignKeyAttribute>)
+				.ToArray();
+
+			foreach (var foreignKey in foreignKeys)
+			{
+				var navigationPropertyName =
+					foreignKey.GetCustomAttribute<ForeignKeyAttribute>().Name;
+				var navigationProperty = entityType.GetProperty(navigationPropertyName);
+
+				var navigationDbSet = this.GetDbSet(navigationProperty.PropertyType)
+					.GetValue(this);
+
+				var navigationPrimaryKey = navigationProperty.PropertyType.GetProperties()
+					.First(ReflectionHelper.HasAttribute<KeyAttribute>);
+
+				foreach (var entity in dbSet)
 				{
-					var navigationPropertyName =
-						foreignKey.GetCustomAttribute<ForeignKeyAttribute>().Name;
-					var navigationProperty = entityType.GetProperty(navigationPropertyName);
+					var foreignKeyValue = foreignKey.GetValue(entity);
 
-					var navigationDbSet = this.GetDbSet(navigationProperty.PropertyType)
-						.GetValue(this);
+					var navigationPropertyValue = ((IEnumerable<object>) navigationDbSet)
+						.First(currentNavigationProperty =>
+							navigationPrimaryKey.GetValue(currentNavigationProperty).Equals(foreignKeyValue));
 
-					var navigationPrimaryKey = navigationProperty.PropertyType.GetProperties()
-						.First(ReflectionHelper.HasAttribute<KeyAttribute>);
-
-					foreach (var entity in (IEnumerable) dbSet)
-					{
-						var foreignKeyValue = foreignKey.GetValue(entity);
-
-						var navigationPropertyValue = ((IEnumerable<object>) navigationDbSet)
-							.First(currentNavigationProperty =>
-								navigationPrimaryKey.GetValue(currentNavigationProperty).Equals(foreignKeyValue));
-
-						navigationProperty.SetValue(entity, navigationPropertyValue);
-					}
-				}
-
-				var collections = entityType
-					.GetProperties()
-					.Where(pi =>
-						pi.PropertyType.IsGenericType &&
-						pi.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
-					.ToArray();
-
-				foreach (var collection in collections)
-				{
-					var collectionType = collection.PropertyType.GenericTypeArguments.First();
-
-					var primaryKeys = collectionType.GetProperties()
-						.Where(ReflectionHelper.HasAttribute<KeyAttribute>)
-						.ToArray();
-
-					var isManyToMany = primaryKeys.Length >= 2;
-
-					PropertyInfo primaryKey;
-					PropertyInfo foreignKey;
-
-					if (!isManyToMany)
-					{
-						primaryKey = primaryKeys.First();
-
-						foreignKey = entityType.GetProperties()
-							.First(ReflectionHelper.HasAttribute<KeyAttribute>);
-					}
-					else
-					{
-						primaryKey = collectionType.GetProperties()
-							.First(pi => ReflectionHelper.HasAttribute<KeyAttribute>(pi) &&
-							             collectionType
-								             .GetProperty(pi.GetCustomAttribute<ForeignKeyAttribute>().Name)
-								             .PropertyType == entityType);
-
-						var foreignKeyPropertyName =
-							primaryKey.GetCustomAttribute<ForeignKeyAttribute>().Name;
-						var foreignKeyType = collectionType.GetProperty(foreignKeyPropertyName).PropertyType;
-
-						foreignKey = foreignKeyType.GetProperties()
-							.First(ReflectionHelper.HasAttribute<KeyAttribute>);
-					}
-
-					var navigationDbSet = (IEnumerable) dbSets
-						.First(s => s.GetType().GenericTypeArguments.First() == collectionType);
-
-					foreach (var entity in (IEnumerable) dbSet)
-					{
-						var primaryKeyValue = foreignKey.GetValue(entity);
-
-						var navigationEntities = ((IEnumerable<object>) navigationDbSet)
-							.Where(navigationEntity => primaryKey.GetValue(navigationEntity).Equals(primaryKeyValue))
-							.ToArray();
-
-						var castResult =
-							ReflectionHelper.InvokeStaticGenericMethod(typeof(Enumerable), "Cast", collectionType,
-								new object[] {navigationEntities});
-						var navigationEntitiesGeneric =
-							ReflectionHelper.InvokeStaticGenericMethod(typeof(Enumerable), "ToArray", collectionType,
-								castResult);
-
-						ReflectionHelper.ReplaceBackingField(entity, collection.Name, navigationEntitiesGeneric);
-					}
+					navigationProperty.SetValue(entity, navigationPropertyValue);
 				}
 			}
 		}

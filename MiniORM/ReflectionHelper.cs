@@ -7,16 +7,6 @@
 
 	internal static class ReflectionHelper
 	{
-		public static object InvokeStaticGenericMethod(Type type, string methodName, Type genericType, params object[] args)
-		{
-			var method = type
-				.GetMethod(methodName)
-				.MakeGenericMethod(genericType);
-
-			var invokeResult = method.Invoke(null, args);
-			return invokeResult;
-		}
-
 		public static void ReplaceBackingField(object sourceObj, string propertyName, object targetObj)
 		{
 			var backingField = sourceObj.GetType()
