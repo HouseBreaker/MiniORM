@@ -62,7 +62,7 @@
 			var modifiedEntities = new List<T>();
 
 			var primaryKeys = typeof(T).GetProperties()
-				.Where(ReflectionHelper.HasAttribute<KeyAttribute>)
+				.Where(pi => pi.HasAttribute<KeyAttribute>())
 				.ToArray();
 
 			foreach (var proxyEntity in this.AllEntities)

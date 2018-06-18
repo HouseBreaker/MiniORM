@@ -4,10 +4,9 @@
 	using System.Collections;
 	using System.Collections.Generic;
 	using System.Linq;
-
 	using JetBrains.Annotations;
 
-	public class DbSet<T> : ICollection<T>
+	public class DbSet<T> : ICollection<T> 
 		where T : class, new()
 	{
 		internal DbSet([NotNull] IEnumerable<T> entities)
@@ -33,7 +32,14 @@
 			this.ChangeTracker.Add(item);
 		}
 
-		public void Clear() => this.Entities.Clear();
+		public void Clear()
+		{
+			while (this.Entities.Any())
+			{
+				var entity = this.Entities.First();
+				this.Remove(entity);
+			}
+		}
 
 		public bool Contains(T item) => this.Entities.Contains(item);
 

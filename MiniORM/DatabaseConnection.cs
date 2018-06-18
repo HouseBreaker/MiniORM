@@ -103,7 +103,6 @@
 						rows.Add(obj);
 					}
 				}
-
 			}
 
 			return rows;
@@ -165,7 +164,7 @@
 			var columnsToUpdate = columns.Except(identityColumns).ToArray();
 
 			var primaryKeyProperties = typeof(T).GetProperties()
-				.Where(ReflectionHelper.HasAttribute<KeyAttribute>)
+				.Where(pi => pi.HasAttribute<KeyAttribute>())
 				.ToArray();
 
 			foreach (var entity in modifiedEntities)
@@ -209,7 +208,7 @@
 			where T : class
 		{
 			var primaryKeyProperties = typeof(T).GetProperties()
-				.Where(ReflectionHelper.HasAttribute<KeyAttribute>)
+				.Where(pi => pi.HasAttribute<KeyAttribute>())
 				.ToArray();
 
 			foreach (var entity in entitiesToDelete)

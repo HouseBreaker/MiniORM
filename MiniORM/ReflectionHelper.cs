@@ -16,7 +16,7 @@
 			backingField.SetValue(sourceObj, targetObj);
 		}
 
-		public static bool HasAttribute<T>([NotNull] MemberInfo mi)
+		public static bool HasAttribute<T>([NotNull] this MemberInfo mi)
 			where T : Attribute
 		{
 			var hasAttribute = mi.GetCustomAttribute<T>() != null;

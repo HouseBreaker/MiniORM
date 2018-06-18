@@ -14,7 +14,7 @@
 	{
 		private readonly DatabaseConnection connection;
 
-		private readonly IEnumerable<PropertyInfo> dbSetProperties;
+		private readonly Dictionary<Type, PropertyInfo> dbSetProperties;
 
 		internal static readonly Type[] AllowedSqlTypes =
 		{
@@ -45,12 +45,12 @@
 		public void SaveChanges()
 		{
 			var dbSets = this.dbSetProperties
-				.Select(pi => pi.GetValue(this))
+				.Select(pi => pi.Value.GetValue(this))
 				.ToArray();
 
-			foreach (IEnumerable dbSet in dbSets)
+			foreach (IEnumerable<object> dbSet in dbSets)
 			{
-				var invalidEntities = ((IEnumerable<object>) dbSet)
+				var invalidEntities = dbSet
 					.Where(entity => !IsObjectValid(entity))
 					.ToArray();
 
@@ -125,9 +125,10 @@
 
 		private void InitializeDbSets()
 		{
-			foreach (var dbSetProperty in this.dbSetProperties)
+			foreach (var dbSet in this.dbSetProperties)
 			{
-				var dbSetType = dbSetProperty.PropertyType.GenericTypeArguments.First();
+				var dbSetType = dbSet.Key;
+				var dbSetProperty = dbSet.Value;
 
 				var populateDbSetGeneric = typeof(DbContext)
 					.GetMethod("PopulateDbSet", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -141,13 +142,13 @@
 		{
 			foreach (var dbSetProperty in this.dbSetProperties)
 			{
-				var dbSetType = dbSetProperty.PropertyType.GenericTypeArguments.First();
+				var dbSetType = dbSetProperty.Key;
 
 				var mapRelationsGeneric = typeof(DbContext)
 					.GetMethod("MapRelations", BindingFlags.Instance | BindingFlags.NonPublic)
 					.MakeGenericMethod(dbSetType);
 
-				var dbSet = dbSetProperty.GetValue(this);
+				var dbSet = dbSetProperty.Value.GetValue(this);
 
 				mapRelationsGeneric.Invoke(this, new[] {dbSet});
 			}
@@ -198,15 +199,14 @@
 			var collectionType = typeof(TCollection);
 
 			var primaryKeys = collectionType.GetProperties()
-				.Where(ReflectionHelper.HasAttribute<KeyAttribute>)
+				.Where(pi => pi.HasAttribute<KeyAttribute>())
 				.ToArray();
-
-			var isManyToMany = primaryKeys.Length >= 2;
 
 			var primaryKey = primaryKeys.First();
 			var foreignKey = entityType.GetProperties()
-				.First(ReflectionHelper.HasAttribute<KeyAttribute>);
+				.First(pi => pi.HasAttribute<KeyAttribute>());
 
+			var isManyToMany = primaryKeys.Length >= 2;
 			if (isManyToMany)
 			{
 				primaryKey = collectionType.GetProperties()
@@ -215,9 +215,7 @@
 						             .PropertyType == entityType);
 			}
 
-			var navigationDbSet = (DbSet<TCollection>) this.dbSetProperties
-				.First(s => s.PropertyType.GenericTypeArguments.First() == collectionType)
-				.GetValue(this);
+			var navigationDbSet = (DbSet<TCollection>) this.dbSetProperties[collectionType].GetValue(this);
 
 			foreach (var entity in dbSet)
 			{
@@ -236,7 +234,7 @@
 			var entityType = typeof(T);
 
 			var foreignKeys = entityType.GetProperties()
-				.Where(ReflectionHelper.HasAttribute<ForeignKeyAttribute>)
+				.Where(pi => pi.HasAttribute<ForeignKeyAttribute>())
 				.ToArray();
 
 			foreach (var foreignKey in foreignKeys)
@@ -245,11 +243,11 @@
 					foreignKey.GetCustomAttribute<ForeignKeyAttribute>().Name;
 				var navigationProperty = entityType.GetProperty(navigationPropertyName);
 
-				var navigationDbSet = this.GetDbSet(navigationProperty.PropertyType)
+				var navigationDbSet = this.dbSetProperties[navigationProperty.PropertyType]
 					.GetValue(this);
 
 				var navigationPrimaryKey = navigationProperty.PropertyType.GetProperties()
-					.First(ReflectionHelper.HasAttribute<KeyAttribute>);
+					.First(pi => pi.HasAttribute<KeyAttribute>());
 
 				foreach (var entity in dbSet)
 				{
@@ -294,22 +292,17 @@
 
 			if (tableName == null)
 			{
-				tableName = this.GetDbSet(tableType).Name;
+				tableName = this.dbSetProperties[tableType].Name;
 			}
 
 			return tableName;
 		}
 
-		private PropertyInfo GetDbSet(Type tableType)
-		{
-			return this.GetDbSetProperties().First(pi => pi.PropertyType.GetGenericArguments().First() == tableType);
-		}
-
-		private IEnumerable<PropertyInfo> GetDbSetProperties()
+		private Dictionary<Type, PropertyInfo> GetDbSetProperties()
 		{
 			var dbSets = this.GetType().GetProperties()
 				.Where(pi => pi.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
-				.ToArray();
+				.ToDictionary(pi => pi.PropertyType.GetGenericArguments().First(), pi => pi);
 
 			return dbSets;
 		}
@@ -322,7 +315,7 @@
 
 			var columns = table.GetProperties()
 				.Where(pi => dbColumns.Contains(pi.Name) &&
-				             !ReflectionHelper.HasAttribute<NotMappedAttribute>(pi) &&
+				             !pi.HasAttribute<NotMappedAttribute>() &&
 				             AllowedSqlTypes.Contains(pi.PropertyType))
 				.Select(pi => pi.Name)
 				.ToArray();
