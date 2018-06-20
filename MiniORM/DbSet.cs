@@ -6,21 +6,21 @@
 	using System.Linq;
 	using JetBrains.Annotations;
 
-	public class DbSet<T> : ICollection<T> 
-		where T : class, new()
+	public class DbSet<TEntity> : ICollection<TEntity> 
+		where TEntity : class, new()
 	{
-		internal DbSet([NotNull] IEnumerable<T> entities)
+		internal DbSet([NotNull] IEnumerable<TEntity> entities)
 		{
 			this.Entities = entities.ToList();
 
-			this.ChangeTracker = new ChangeTracker<T>(entities);
+			this.ChangeTracker = new ChangeTracker<TEntity>(entities);
 		}
 
-		internal ChangeTracker<T> ChangeTracker { get; set; }
+		internal ChangeTracker<TEntity> ChangeTracker { get; set; }
 
-		internal IList<T> Entities { get; set; }
+		internal IList<TEntity> Entities { get; set; }
 
-		public void Add(T item)
+		public void Add(TEntity item)
 		{
 			if (item == null)
 			{
@@ -41,15 +41,15 @@
 			}
 		}
 
-		public bool Contains(T item) => this.Entities.Contains(item);
+		public bool Contains(TEntity item) => this.Entities.Contains(item);
 
-		public void CopyTo(T[] array, int arrayIndex) => this.Entities.CopyTo(array, arrayIndex);
+		public void CopyTo(TEntity[] array, int arrayIndex) => this.Entities.CopyTo(array, arrayIndex);
 
 		public int Count => this.Entities.Count;
 
 		public bool IsReadOnly => this.Entities.IsReadOnly;
 
-		public bool Remove(T item)
+		public bool Remove(TEntity item)
 		{
 			if (item == null)
 			{
@@ -66,7 +66,7 @@
 			return removedSuccessfully;
 		}
 
-		public IEnumerator<T> GetEnumerator()
+		public IEnumerator<TEntity> GetEnumerator()
 		{
 			return this.Entities.GetEnumerator();
 		}
@@ -76,7 +76,7 @@
 			return this.GetEnumerator();
 		}
 
-		public void RemoveRange(IEnumerable<T> entities)
+		public void RemoveRange(IEnumerable<TEntity> entities)
 		{
 			foreach (var entity in entities.ToArray())
 			{

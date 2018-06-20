@@ -3,7 +3,6 @@
 	using System;
 	using System.Linq;
 	using System.Reflection;
-	using JetBrains.Annotations;
 
 	internal static class ReflectionHelper
 	{
@@ -16,7 +15,7 @@
 			backingField.SetValue(sourceObj, targetObj);
 		}
 
-		public static bool HasAttribute<T>([NotNull] this MemberInfo mi)
+		public static bool HasAttribute<T>(this MemberInfo mi)
 			where T : Attribute
 		{
 			var hasAttribute = mi.GetCustomAttribute<T>() != null;

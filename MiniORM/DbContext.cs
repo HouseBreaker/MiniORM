@@ -10,7 +10,7 @@
 	using System.Reflection;
 	using JetBrains.Annotations;
 
-	public class DbContext
+	public abstract class DbContext
 	{
 		private readonly DatabaseConnection connection;
 
@@ -28,11 +28,11 @@
 			typeof(DateTime)
 		};
 
-		public DbContext(string connectionString)
+		protected DbContext(string connectionString)
 		{
 			this.connection = new DatabaseConnection(connectionString);
 
-			this.dbSetProperties = this.GetDbSetProperties();
+			this.dbSetProperties = this.DiscoverDbSets();
 
 			using (new ConnectionManager(connection))
 			{
@@ -99,10 +99,10 @@
 		}
 
 		[UsedImplicitly]
-		private void Persist<T>(DbSet<T> dbSet, SqlTransaction transaction)
-			where T : class, new()
+		private void Persist<TEntity>(DbSet<TEntity> dbSet, SqlTransaction transaction)
+			where TEntity : class, new()
 		{
-			var tableName = GetTableName(typeof(T));
+			var tableName = GetTableName(typeof(TEntity));
 
 			var columns = this.connection.FetchColumnNames(tableName).ToArray();
 
@@ -155,20 +155,20 @@
 		}
 
 		[UsedImplicitly]
-		private void PopulateDbSet<T>(PropertyInfo dbSet)
-			where T : class, new()
+		private void PopulateDbSet<TEntity>(PropertyInfo dbSet)
+			where TEntity : class, new()
 		{
-			var entities = LoadTableEntities<T>(dbSet);
+			var entities = LoadTableEntities<TEntity>();
 
-			var dbSetInstance = new DbSet<T>(entities);
+			var dbSetInstance = new DbSet<TEntity>(entities);
 			ReflectionHelper.ReplaceBackingField(this, dbSet.Name, dbSetInstance);
 		}
 
 		[UsedImplicitly]
-		private void MapRelations<T>(DbSet<T> dbSet)
-			where T : class, new()
+		private void MapRelations<TEntity>(DbSet<TEntity> dbSet)
+			where TEntity : class, new()
 		{
-			var entityType = typeof(T);
+			var entityType = typeof(TEntity);
 
 			MapNavigationProperties(dbSet);
 
@@ -229,9 +229,9 @@
 			}
 		}
 
-		private void MapNavigationProperties<T>(DbSet<T> dbSet) where T : class, new()
+		private void MapNavigationProperties<TEntity>(DbSet<TEntity> dbSet) where TEntity : class, new()
 		{
-			var entityType = typeof(T);
+			var entityType = typeof(TEntity);
 
 			var foreignKeys = entityType.GetProperties()
 				.Where(pi => pi.HasAttribute<ForeignKeyAttribute>())
@@ -272,16 +272,16 @@
 			return validationResult;
 		}
 
-		private IEnumerable<T> LoadTableEntities<T>(PropertyInfo dbSet)
-			where T : class
+		private IEnumerable<TEntity> LoadTableEntities<TEntity>()
+			where TEntity : class
 		{
-			var table = dbSet.PropertyType.GenericTypeArguments.First();
+			var table = typeof(TEntity);
 
 			var columns = GetEntityColumnNames(table);
 
 			var tableName = GetTableName(table);
 
-			var fetchedRows = this.connection.FetchResultSet<T>(tableName, columns).ToArray();
+			var fetchedRows = this.connection.FetchResultSet<TEntity>(tableName, columns).ToArray();
 
 			return fetchedRows;
 		}
@@ -298,7 +298,7 @@
 			return tableName;
 		}
 
-		private Dictionary<Type, PropertyInfo> GetDbSetProperties()
+		private Dictionary<Type, PropertyInfo> DiscoverDbSets()
 		{
 			var dbSets = this.GetType().GetProperties()
 				.Where(pi => pi.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
