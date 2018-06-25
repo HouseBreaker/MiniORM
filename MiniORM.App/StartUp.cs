@@ -20,13 +20,8 @@
 				IsEmployed = true,
 			});
 
-			context.Employees.Add(new Employee
-			{
-				FirstName = "Pesho",
-				LastName = "Inserted",
-				DepartmentId = context.Departments.First().Id,
-				IsEmployed = true,
-			});
+			var employee = context.Employees.Last();
+			employee.FirstName = "Modified";
 
 			context.SaveChanges();
 		}
