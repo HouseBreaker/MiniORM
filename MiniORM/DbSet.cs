@@ -4,12 +4,11 @@
 	using System.Collections;
 	using System.Collections.Generic;
 	using System.Linq;
-	using JetBrains.Annotations;
 
-	public class DbSet<TEntity> : ICollection<TEntity> 
+	public class DbSet<TEntity> : ICollection<TEntity>
 		where TEntity : class, new()
 	{
-		internal DbSet([NotNull] IEnumerable<TEntity> entities)
+		internal DbSet(IEnumerable<TEntity> entities)
 		{
 			this.Entities = entities.ToList();
 

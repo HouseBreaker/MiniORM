@@ -8,7 +8,6 @@
 	using System.Data.SqlClient;
 	using System.Linq;
 	using System.Reflection;
-	using JetBrains.Annotations;
 
 	public abstract class DbContext
 	{
@@ -75,7 +74,7 @@
 
 						try
 						{
-							persistMethod.Invoke(this, new object[] {dbSet, transaction});
+							persistMethod.Invoke(this, new object[] {dbSet});
 						}
 						catch (TargetInvocationException tie)
 						{
@@ -98,8 +97,7 @@
 			}
 		}
 
-		[UsedImplicitly]
-		private void Persist<TEntity>(DbSet<TEntity> dbSet, SqlTransaction transaction)
+		private void Persist<TEntity>(DbSet<TEntity> dbSet)
 			where TEntity : class, new()
 		{
 			var tableName = GetTableName(typeof(TEntity));
@@ -154,7 +152,6 @@
 			}
 		}
 
-		[UsedImplicitly]
 		private void PopulateDbSet<TEntity>(PropertyInfo dbSet)
 			where TEntity : class, new()
 		{
@@ -164,7 +161,6 @@
 			ReflectionHelper.ReplaceBackingField(this, dbSet.Name, dbSetInstance);
 		}
 
-		[UsedImplicitly]
 		private void MapRelations<TEntity>(DbSet<TEntity> dbSet)
 			where TEntity : class, new()
 		{
@@ -191,7 +187,6 @@
 			}
 		}
 
-		[UsedImplicitly]
 		private void MapCollection<TDbSet, TCollection>(DbSet<TDbSet> dbSet, PropertyInfo collectionProperty)
 			where TDbSet : class, new() where TCollection : class, new()
 		{
